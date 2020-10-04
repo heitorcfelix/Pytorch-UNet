@@ -69,3 +69,53 @@ class BasicDataset(Dataset):
 class CarvanaDataset(BasicDataset):
     def __init__(self, imgs_dir, masks_dir, scale=1):
         super().__init__(imgs_dir, masks_dir, scale, mask_suffix='_mask')
+
+class MVTecDataset(Dataset):
+    def __init__(self, class_name, train=False, good=True):
+        if train:
+            self.ids = glob(f'./data/{class_name}/train/good/*')
+        else:
+            if good:
+                self.ids = glob(f'./data/{class_name}/test/good/*')
+            else:
+                self.ids = [img for img in glob("./data/{class_name}/test/*/*") if not 'good' in img]
+        self.scale = 1
+        assert 0 < self.scale <= 1, 'Scale must be between 0 and 1'
+
+        logging.info(f'Creating dataset with {len(self.ids)} examples')
+
+    def __len__(self):
+        return len(self.ids)
+
+    @classmethod
+    def preprocess(cls, pil_img, scale):
+        w, h = pil_img.size
+        newW, newH = int(scale * w), int(scale * h)
+        assert newW > 0 and newH > 0, 'Scale is too small'
+        pil_img = pil_img.resize((256, 256))
+
+        img_nd = np.array(pil_img)
+
+        if len(img_nd.shape) == 2:
+            img_nd = np.expand_dims(img_nd, axis=2)
+
+        # HWC to CHW
+        img_trans = img_nd.transpose((2, 0, 1))
+        if img_trans.max() > 1:
+            img_trans = img_trans / 255
+
+        return img_trans
+
+    def __getitem__(self, i):
+        img_file = self.ids[i]
+
+        assert img_file, \
+            f'No image for the ID {i}: {img_file}'
+        img = Image.open(img_file)
+
+        img = self.preprocess(img, self.scale)
+
+        return {
+            'image': torch.from_numpy(img).type(torch.FloatTensor),
+            'mask':  torch.from_numpy(img).type(torch.FloatTensor)
+        }
