@@ -78,7 +78,7 @@ class MVTecDataset(Dataset):
             if good:
                 self.ids = glob(f'./data/{class_name}/test/good/*')
             else:
-                self.ids = [img for img in glob("./data/{class_name}/test/*/*") if not 'good' in img]
+                self.ids = [img for img in glob(f'./data/{class_name}/test/*/*') if not 'good' in img]
         self.scale = 1
         assert 0 < self.scale <= 1, 'Scale must be between 0 and 1'
 

@@ -57,17 +57,17 @@ def otsu_threshold(histogram, scores):
 def main():
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-    unet = UNet(n_channels=3, n_classes=3, bilinear=True)
-    unet.load_state_dict(torch.load('./checkpoints/CP_best.pth', map_location=device))
-    unet.to(device=device)
+    net = UNet(n_channels=3, n_classes=3, bilinear=True)
+    net.load_state_dict(torch.load('./checkpoints/CP_best.pth', map_location=device))
+    net.to(device=device)
 
-    dataset_val_zero = MVTecDataset(options.dataset_dir + 'test/0.normal/', 1)
-    dataset_val_one = MVTecDataset(options.dataset_dir + 'test/1.abnormal/', 1)
+    dataset_val_zero = MVTecDataset(options.class_name, train=False, good=True)
+    dataset_val_one = MVTecDataset(options.class_name, train=False, good=False)
 
     val_loader_zero = DataLoader(dataset_val_zero, batch_size=1, shuffle=False, num_workers=8, pin_memory=True, drop_last=True)
     val_loader_one = DataLoader(dataset_val_one, batch_size=1, shuffle=False, num_workers=8, pin_memory=True, drop_last=True)
 
-    unet.eval()
+    net.eval()
 
     n_val_zero = len(val_loader_zero)
     n_val_one = len(val_loader_one)
@@ -81,7 +81,7 @@ def main():
             true_masks = true_masks.to(device=device, dtype=torch.float32)
 
             with torch.no_grad():
-                mask_pred = net_G(imgs)
+                mask_pred = net(imgs)
                 scores.append(F.mse_loss(mask_pred, true_masks).item())
             pbar.update()
 
@@ -92,7 +92,7 @@ def main():
             true_masks = true_masks.to(device=device, dtype=torch.float32)
 
             with torch.no_grad():
-                mask_pred = net_G(imgs)
+                mask_pred = net(imgs)
                 scores.append(F.mse_loss(mask_pred, true_masks).item())
             pbar.update()
 
@@ -123,15 +123,15 @@ def main():
         plt.savefig('eval_histogram.jpg')
 
     threshold = otsu_threshold(hist, scores)
-    scores[scores >= otsu_threshold(scores)] = 1
-    scores[scores <  otsu_threshold(scores)] = 0
+    scores[scores >= threshold] = 1
+    scores[scores <  threshold] = 0
     fpr, tpr, _ = roc_curve(labels, scores)
 
     print(average_precision_score(labels, scores))
 
-def eval_net(unet, loader, device):
+def eval_net(net, loader, device):
     """Evaluation"""
-    unet.eval()
+    net.eval()
     n_val = len(loader)
     tot = 0
 
@@ -142,11 +142,11 @@ def eval_net(unet, loader, device):
             true_masks = true_masks.to(device=device, dtype=torch.float32)
 
             with torch.no_grad():
-                mask_pred = unet(imgs)
+                mask_pred = net(imgs)
                 tot += F.mse_loss(mask_pred, true_masks).item()
             pbar.update()
 
-    unet.train()
+    net.train()
     return tot / n_val
 
 if __name__ == "__main__":
