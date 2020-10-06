@@ -12,6 +12,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch import optim
 from tqdm import tqdm
+from copy import deepcopy
 
 from unet import UNet
 
@@ -122,12 +123,35 @@ def main():
     if options.save_hist:
         plt.savefig('eval_histogram.jpg')
 
+    scores_disc = deepcopy(scores)
     threshold = otsu_threshold(hist, scores)
-    scores[scores >= threshold] = 1
-    scores[scores <  threshold] = 0
-    fpr, tpr, _ = roc_curve(labels, scores)
+    scores_disc[scores >= threshold] = 1
+    scores_disc[scores <  threshold] = 0
 
-    print(average_precision_score(labels, scores))
+    print('Otsu AP: ', average_precision_score(labels, scores_disc))
+    print('Otsu threshold: ', threshold)
+
+    threshold = 0
+    best_value = 0
+    best_threshold = 0
+    for i in range(1000):
+        threshold += 0.000001
+        scores_disc = deepcopy(scores)
+        scores_disc[scores >= threshold] = 1
+        scores_disc[scores <  threshold] = 0
+        value = average_precision_score(labels, scores_disc)
+        if value > best_value:
+            best_value = value
+            best_threshold = threshold
+    print('T/E AP: ', best_value)
+    print('T/E threshold: ', best_threshold)
+
+    scores_disc = deepcopy(scores)
+    scores_disc[scores >= np.median(scores)] = 1
+    scores_disc[scores <  np.median(scores)] = 0
+    print('Median AP: ', average_precision_score(labels, scores_disc))
+    print('Median threshold: ', np.median(scores))
+
 
 def eval_net(net, loader, device):
     """Evaluation"""
