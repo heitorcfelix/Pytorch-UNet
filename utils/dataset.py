@@ -71,7 +71,7 @@ class CarvanaDataset(BasicDataset):
         super().__init__(imgs_dir, masks_dir, scale, mask_suffix='_mask')
 
 class MVTecDataset(Dataset):
-    def __init__(self, class_name, train=False, good=True):
+    def __init__(self, class_name, train=False, good=True, transforms=None):
         if train:
             self.ids = glob(f'./data/{class_name}/train/good/*')
         else:
@@ -80,6 +80,7 @@ class MVTecDataset(Dataset):
             else:
                 self.ids = [img for img in glob(f'./data/{class_name}/test/*/*') if not 'good' in img]
         self.scale = 1
+        self.transforms = transforms
         assert 0 < self.scale <= 1, 'Scale must be between 0 and 1'
 
         logging.info(f'Creating dataset with {len(self.ids)} examples')
@@ -114,8 +115,10 @@ class MVTecDataset(Dataset):
         img = Image.open(img_file)
 
         img = self.preprocess(img, self.scale)
-
-        return {
-            'image': torch.from_numpy(img).type(torch.FloatTensor),
-            'mask':  torch.from_numpy(img).type(torch.FloatTensor)
-        }
+        data = { 'image': img, 'mask' : img.copy()}
+        
+        if self.transforms:
+            for transform in self.transforms:
+                data = transform(data)
+            
+        return data

@@ -15,6 +15,7 @@ from unet import UNet
 
 from torch.utils.tensorboard import SummaryWriter
 from utils.dataset import BasicDataset, MVTecDataset
+from utils.aug import RandomElastic, RandomSaltPeper, RandomNoting, ToTensor
 from torch.utils.data import DataLoader, random_split
 
 
@@ -27,12 +28,12 @@ def train_net(net,
               save_cp=True,
               img_scale=0.5):
 
-    dataset_train = MVTecDataset(options.class_name, train=True)
-    dataset_val = MVTecDataset(options.class_name, train=False)
-    n_val = len(dataset_val)
-    n_train = len(dataset_train)
-    train_loader = DataLoader(dataset_train, batch_size=batch_size, shuffle=True, num_workers=8, pin_memory=True)
-    val_loader = DataLoader(dataset_val, batch_size=batch_size, shuffle=False, num_workers=8, pin_memory=True, drop_last=True)
+    dataset_train = MVTecDataset(options.class_name, train=True, transforms=[RandomElastic(0.2), RandomSaltPeper(0.2, 0.8), RandomNoting(0.2), ToTensor()])
+    dataset_val   = MVTecDataset(options.class_name, train=False, transforms=[RandomElastic(0.1), RandomSaltPeper(0.1, 0.8), RandomNoting(0.1), ToTensor()])
+    n_val         = len(dataset_val)
+    n_train       = len(dataset_train)
+    train_loader  = DataLoader(dataset_train, batch_size=batch_size, shuffle=True, num_workers=8, pin_memory=True)
+    val_loader    = DataLoader(dataset_val, batch_size=batch_size, shuffle=False, num_workers=8, pin_memory=True, drop_last=True)
 
     writer = SummaryWriter(comment=f'_UNet_Class_{options.class_name}_Epochs_{options.epochs}')
     global_step = 0
