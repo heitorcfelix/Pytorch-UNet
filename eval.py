@@ -13,6 +13,7 @@ import torch.nn.functional as F
 from torch import optim
 from tqdm import tqdm
 from copy import deepcopy
+from time import time
 
 from unet import UNet
 
@@ -59,7 +60,7 @@ def main():
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
     net = UNet(n_channels=3, n_classes=3, bilinear=True)
-    net.load_state_dict(torch.load('./checkpoints/CP_best.pth', map_location=device))
+    net.load_state_dict(torch.load(f'./checkpoints/{options.class_name}/CP_best.pth', map_location=device))
     net.to(device=device)
 
     dataset_val_zero = MVTecDataset(options.class_name, train=False, good=True)
@@ -124,13 +125,17 @@ def main():
         plt.savefig('eval_histogram.jpg')
 
     scores_disc = deepcopy(scores)
+    otsu_time = time()
     threshold = otsu_threshold(hist, scores)
+    otsu_time = time() - otsu_time
     scores_disc[scores >= threshold] = 1
     scores_disc[scores <  threshold] = 0
 
     print('Otsu AP: ', average_precision_score(labels, scores_disc))
     print('Otsu threshold: ', threshold)
+    print('Otsu time: ', otsu_time * 1000)
 
+    te_time = time()
     threshold = 0
     best_value = 0
     best_threshold = 0
@@ -143,14 +148,20 @@ def main():
         if value > best_value:
             best_value = value
             best_threshold = threshold
+    te_time = time() - te_time
     print('T/E AP: ', best_value)
     print('T/E threshold: ', best_threshold)
+    print('T/E time: ', te_time * 1000)
 
     scores_disc = deepcopy(scores)
-    scores_disc[scores >= np.median(scores)] = 1
-    scores_disc[scores <  np.median(scores)] = 0
+    median_time = time()
+    threshold = np.median(scores)
+    median_time = time() - median_time
+    scores_disc[scores >= threshold] = 1
+    scores_disc[scores <  threshold] = 0
     print('Median AP: ', average_precision_score(labels, scores_disc))
-    print('Median threshold: ', np.median(scores))
+    print('Median threshold: ', threshold)
+    print('Median time: ', median_time * 1000)
 
 
 def eval_net(net, loader, device):
